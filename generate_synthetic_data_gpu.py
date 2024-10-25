@@ -14,9 +14,16 @@ from faker import Faker
 # Initialize Faker for PII anonymization
 fake = Faker()
 
+
 def load_data(file_path):
     """
     Load data from a CSV or Excel file.
+
+    Args:
+        file_path (str): Path to the input file.
+
+    Returns:
+        pd.DataFrame: Loaded data as a pandas DataFrame.
     """
     if file_path.endswith('.csv'):
         df = pd.read_csv(file_path)
@@ -26,9 +33,19 @@ def load_data(file_path):
         raise ValueError("Unsupported file format. Please provide a CSV or Excel file.")
     return df
 
+
 def generate_metadata(df, table_name='synthetic_data', pii_columns=None):
     """
     Generate metadata for the DataFrame, handling PII columns if specified.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame for which metadata is generated.
+        table_name (str): The name to assign to the table in metadata.
+        pii_columns (list): List of columns containing PII to be anonymized.
+
+    Returns:
+        Metadata: The generated metadata object.
+        str: The table name.
     """
     # Initialize Metadata object with the dataframe
     metadata = Metadata.detect_from_dataframe(df, table_name=table_name)
@@ -49,6 +66,12 @@ def generate_metadata(df, table_name='synthetic_data', pii_columns=None):
 def get_sdtype(series):
     """
     Determine the SDV data type based on pandas dtype and column content.
+
+    Args:
+        series (pd.Series): The pandas series for which to determine the sdtype.
+
+    Returns:
+        str: The SDV data type for the series.
     """
     dtype = str(series.dtype)
     
@@ -77,9 +100,16 @@ def get_sdtype(series):
     
     return 'string'  # default to string for unknown types
 
+
 def generate_metadata_filename(base_path='metadata.json'):
     """
     Generate a unique metadata filename if the base filename already exists.
+
+    Args:
+        base_path (str): Base path for the metadata file.
+
+    Returns:
+        str: A unique metadata filename.
     """
     if not os.path.exists(base_path):
         return base_path
@@ -95,9 +125,17 @@ def generate_metadata_filename(base_path='metadata.json'):
             return new_path
         counter += 1
 
+
 def save_metadata(metadata, metadata_path):
     """
     Save the metadata to a JSON file, handling existing files.
+
+    Args:
+        metadata (Metadata): The metadata object to save.
+        metadata_path (str): Path to save the metadata file.
+
+    Returns:
+        str: The path where the metadata was saved.
     """
     try:
         # Try to save with the original filename
@@ -113,6 +151,12 @@ def save_metadata(metadata, metadata_path):
 def load_metadata(metadata_path):
     """
     Load metadata from a JSON file.
+
+    Args:
+        metadata_path (str): Path to the metadata JSON file.
+
+    Returns:
+        Metadata: The loaded metadata object.
     """
     if not os.path.exists(metadata_path):
         raise FileNotFoundError(f"Metadata file '{metadata_path}' does not exist.")
@@ -130,6 +174,20 @@ def load_metadata(metadata_path):
 def generate_synthetic_data(df, metadata, table_name, num_samples=100, epochs=300, batch_size=500, synthesizer_path=None, load_synthesizer_flag=False):
     """
     Generate synthetic data using SDV's CTGANSynthesizer with GPU support.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame to train the synthesizer.
+        metadata (Metadata): Metadata for the input DataFrame.
+        table_name (str): Name of the table in metadata.
+        num_samples (int): Number of synthetic samples to generate.
+        epochs (int): Number of training epochs.
+        batch_size (int): Batch size for training.
+        synthesizer_path (str): Path to save/load the synthesizer model.
+        load_synthesizer_flag (bool): Flag indicating whether to load an existing synthesizer model.
+
+    Returns:
+        pd.DataFrame: Generated synthetic data.
+        CTGANSynthesizer: The trained synthesizer model.
     """
     # Determine device to use: GPU if available, otherwise CPU
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -164,6 +222,13 @@ def generate_synthetic_data(df, metadata, table_name, num_samples=100, epochs=30
 def anonymize_pii(df, pii_columns):
     """
     Anonymize specified PII columns using Faker.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing the data to be anonymized.
+        pii_columns (list): List of PII columns to anonymize.
+
+    Returns:
+        pd.DataFrame: DataFrame with anonymized PII columns.
     """
     for column in pii_columns:
         if column in df.columns:
@@ -181,6 +246,10 @@ def anonymize_pii(df, pii_columns):
 def save_data(df, output_path):
     """
     Save the synthetic data to a CSV or Excel file.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing synthetic data to save.
+        output_path (str): Path to save the synthetic data file.
     """
     if output_path.endswith('.csv'):
         df.to_csv(output_path, index=False)
@@ -189,6 +258,7 @@ def save_data(df, output_path):
     else:
         raise ValueError("Unsupported file format. Please provide a CSV or Excel file.")
     print(f"Synthetic data saved to {output_path}")
+
 
 def evaluate_synthetic_data(real_data, synthetic_data, metadata, report_path='quality_report.json'):
     """
@@ -222,6 +292,13 @@ def evaluate_synthetic_data(real_data, synthetic_data, metadata, report_path='qu
 
 
 def main():
+    """
+    Main function to generate synthetic data from input CSV or Excel using SDV.
+
+    Parses command-line arguments, loads data, handles PII columns, generates or loads metadata,
+    trains or loads a synthesizer, generates synthetic data, anonymizes PII columns (if specified),
+    and evaluates the quality of synthetic data.
+    """
     parser = argparse.ArgumentParser(description="Generate Synthetic Data from CSV or Excel using SDV.")
     
     # Required arguments
@@ -237,6 +314,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=500, help='Batch size for training the synthesizer.')
     parser.add_argument('--load_metadata', action='store_true', help='Load metadata from the specified metadata file instead of generating it.')
     parser.add_argument('--load_synthesizer', action='store_true', help='Load a pre-trained synthesizer from the specified synthesizer file.')
+    parser.add_argument('--anonymize_pii', action='store_true', help='Anonymize PII columns in the generated synthetic data.')
     
     args = parser.parse_args()
     
@@ -250,6 +328,7 @@ def main():
     batch_size = args.batch_size
     load_metadata_flag = args.load_metadata
     load_synthesizer_flag = args.load_synthesizer
+    anonymize_pii_flag = args.anonymize_pii
     
     # Define the steps for the progress bar
     steps = [
@@ -322,8 +401,8 @@ def main():
         )
         pbar.update(1)
         
-        # Step 5: Anonymize PII columns if specified
-        if pii_columns:
+        # Step 5: Anonymize PII columns if specified and flag is set
+        if pii_columns and anonymize_pii_flag:
             print("\nAnonymizing PII columns...")
             synthetic_data = anonymize_pii(synthetic_data, pii_columns)
             print("PII columns have been anonymized.")
@@ -357,6 +436,7 @@ def main():
         pbar.update(1)
     
     print("\nAll steps completed successfully!")
+
 
 if __name__ == "__main__":
     main()
